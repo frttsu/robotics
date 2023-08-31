@@ -45,6 +45,7 @@ class Robot(IdealRobot):
         self.const_nu = 0
         self.const_omega = 0
         self.sensor_time = 1.0
+        self.const_pose = self.pose
         
     def noise(self, pose, nu, omega, time_interval):
         self.distance_until_noise -= abs(nu)*time_interval + self.r*abs(omega)*time_interval
@@ -92,11 +93,17 @@ class Robot(IdealRobot):
         else:
             obs = self.sensor.data(self.pose) if self.sensor else None
             print("obs = " ,obs)
+            print("pose = ", self.pose)
             self.sensor_time = 1.0
-
+            
         nu, omega = self.agent.decision(obs)
         nu, omega = self.bias(nu,omega)
         nu, omega = self.stuck(nu,omega,time_interval)
+        if obs :
+            if obs[0][0][0] > 340:
+                self.pose[2] = self.pose[2] + obs[0][0][1]
+                print("theta = ", obs[0][0][1])
+                obs[0][0][1] = 0
         self.pose = self.state_transition(nu,omega,time_interval, self.pose)
         self.pose = self.noise(self.pose, nu,omega, time_interval)
         self.pose = self.kidnap(self.pose, time_interval)
@@ -106,10 +113,10 @@ class Robot(IdealRobot):
 
 class Camera(IdealCamera): ###noisesim_occlusion### 
     def __init__(self, env_map,
-                 distance_range=(0.5, 300),
+                 distance_range=(0.5, 500),
                  direction_range=(-math.pi, math.pi),
-                 distance_noise_rate=0.1, direction_noise=math.pi/90,
-                 distance_bias_rate_stddev=0.1, direction_bias_stddev=math.pi/90,
+                 distance_noise_rate=0.05, direction_noise=math.pi/180,
+                 distance_bias_rate_stddev=0.05, direction_bias_stddev=math.pi/180,
                  phantom_prob=0.0, phantom_range_x=(-5.0,5.0), phantom_range_y=(-5.0,5.0),
                  oversight_prob=0.1, occlusion_prob=0.0): #occlusion_prob追加
         super().__init__(env_map, distance_range, direction_range)
@@ -158,8 +165,8 @@ class Camera(IdealCamera): ###noisesim_occlusion###
     def data(self, cam_pose):
         observed = []
         for lm in self.map.landmarks:
-            print("camera data obj=",lm.pos)
-            print("camera data cam=", cam_pose)
+            #print("camera data obj=",lm.pos)
+            #print("camera data cam=", cam_pose)
             z = self.observation_function(cam_pose, lm.pos)
             z = self.phantom(cam_pose, z) 
             z = self.occlusion(z) #追加

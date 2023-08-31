@@ -197,8 +197,8 @@ class IdealCamera:
     
     @classmethod
     def observation_function(cls, cam_pose, obj_pos):
-        print("obj=",obj_pos)
-        print("cam=",cam_pose)
+        #print("obj=",obj_pos)
+        #print("cam=",cam_pose)
         diff = obj_pos[0:2]- cam_pose[0:2]
         phi = math.atan2(diff[1], diff[0]) - cam_pose[2]
         while phi >= np.pi: phi -= 2*np.pi

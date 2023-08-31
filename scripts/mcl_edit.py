@@ -65,11 +65,11 @@ class Mcl:    ###mlparticle（12〜18行目）
         for p in self.particles: p.motion_update(nu, omega, time, self.motion_noise_rate_pdf)
             
     def observation_update(self, observation): 
-        i = 0
+        #i = 0
         for p in self.particles:
             p.observation_update(observation, self.map, self.distance_dev_rate, self.direction_dev) 
-            print(i)
-            i = i + 1
+            #print(i)
+            #i = i + 1
         self.set_ml() #リサンプリング前に実行
         self.resampling() 
             
