@@ -112,8 +112,10 @@ class EstimationAgent(Agent):
         
     def decision(self, observation=None): 
         self.estimator.motion_update(self.prev_nu, self.prev_omega, self.time_interval)
+        print("before:",self.prev_nu, self.prev_omega)
         self.prev_nu, self.prev_omega = self.nu, self.omega
         self.estimator.observation_update(observation)
+        print("after:", self.nu,self.omega)
         return self.nu, self.omega
         
     def draw(self, ax, elems): ###mlwrite

@@ -47,6 +47,9 @@ class Robot(IdealRobot):
         self.sensor_time = 1.0
         self.const_pose = self.pose
         
+        self.sensor_stuck = []
+        self.mode_switch = False
+        
     def noise(self, pose, nu, omega, time_interval):
         self.distance_until_noise -= abs(nu)*time_interval + self.r*abs(omega)*time_interval
         if self.distance_until_noise <= 0.0:
@@ -71,6 +74,7 @@ class Robot(IdealRobot):
                 self.is_stuck = True
 
         return nu*(not self.is_stuck), omega*(not self.is_stuck)
+         
     
     def kidnap(self, pose, time_interval):
         self.time_until_kidnap -= time_interval
@@ -79,7 +83,30 @@ class Robot(IdealRobot):
             return np.array(self.kidnap_dist.rvs()).T
         else:
             return pose
-            
+        
+    def sensor_append(self, mode, obs):
+        if mode == True:
+            if obs:
+                self.sensor_stuck.append(obs)
+    
+    def straight_to_landmark(self,mode,obs):
+        if obs:
+            if (obs[0][0][0] > 340) or (self.mode_switch == True):
+                    self.pose[2] = self.pose[2] + obs[0][0][1]
+                    print("theta = ", obs[0][0][1])
+                    #obs[0][0][1] = 0
+                    if self.mode_switch == False: 
+                        self.mode_switch = True
+                
+    def shift_transition(self, nu, omega, time):
+        t0 = self.pose[2]
+        if math.fabs(omega) < 1e-10:
+            return self.pose + np.array( [nu*math.cos(t0)+2.0,
+                                     nu*math.sin(t0),
+                                     omega ] ) / math.sqrt((nu*math.cos(t0)+2.0)**2 +(nu*math.sin(t0))**2) * math.sqrt((nu*math.cos(t0))**2 +(nu*math.sin(t0))**2) * time
+        else:
+            return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time)- math.sin(t0))+2.0,nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),                                    omega*time ] ) / math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
+        
         
     def one_step(self,time_interval):
         if not self.agent: return
@@ -92,21 +119,31 @@ class Robot(IdealRobot):
             self.is_first = False
         else:
             obs = self.sensor.data(self.pose) if self.sensor else None
-            print("obs = " ,obs)
-            print("pose = ", self.pose)
+            #print("obs = " , obs)
+            #print("pose = ", self.pose)
+            #print("sensor_stuck = ", self.sensor_stuck)
             self.sensor_time = 1.0
-            
+            if obs:
+                print(self.pose + np.array([obs[0][0][0] * math.cos(obs[0][0][1]), obs[0][0][0] * math.sin(obs[0][0][1]),0]))
+        
+        self.sensor_append(True,obs)
+        
         nu, omega = self.agent.decision(obs)
         nu, omega = self.bias(nu,omega)
         nu, omega = self.stuck(nu,omega,time_interval)
-        if obs :
-            if obs[0][0][0] > 340:
-                self.pose[2] = self.pose[2] + obs[0][0][1]
-                print("theta = ", obs[0][0][1])
-                obs[0][0][1] = 0
+        
+        self.straight_to_landmark(self.mode_switch, obs)
+        
+        if self.mode_switch == True:
+            self.pose = self.shift_transition(nu,omega,time_interval)
+        else:
+            self.pose = self.state_transition(nu,omega,time_interval, self.pose)
         self.pose = self.state_transition(nu,omega,time_interval, self.pose)
+
         self.pose = self.noise(self.pose, nu,omega, time_interval)
+        #print("obs =", obs) 
         self.pose = self.kidnap(self.pose, time_interval)
+
 
 # In[3]:
 
