@@ -8,8 +8,15 @@ import sys
 sys.path.append('../scripts/')
 from ideal_robot_edit import *
 from scipy.stats import expon, norm, uniform
+from enum import Enum
 
 
+# In[2]:
+
+class Mode(Enum):
+    STATE_TRANSITION = 1
+    STRAIGHT_TRANSITION = 2
+    SHIFT_TRANSITION = 3
 # In[2]:
 
 
@@ -40,15 +47,26 @@ class Robot(IdealRobot):
         self.time_until_kidnap = self.kidnap_pdf.rvs()
         rx, ry = kidnap_range_x, kidnap_range_y
         self.kidnap_dist = uniform(loc=(rx[0], ry[0], 0.0), scale=(rx[1]-rx[0], ry[1]-ry[0], 2*math.pi ))
+        
         #one_stepに必要な関数
         self.is_first = True
-        self.const_nu = 0
-        self.const_omega = 0
-        self.sensor_time = 1.0
-        self.const_pose = self.pose
+#         self.const_nu = 0
+#         self.const_omega = 0
+        
+        self.const_time = 1.0
+        self.sensor_time = self.const_time
+        
+#         self.const_pose = self.pose
         
         self.sensor_stuck = []
-        self.mode_switch = False
+        self.shift_switch = True
+        
+        self.keep_straight = False
+        self.keep_shift = False
+        
+        self.mode = Mode.STATE_TRANSITION
+        
+        
         
     def noise(self, pose, nu, omega, time_interval):
         self.distance_until_noise -= abs(nu)*time_interval + self.r*abs(omega)*time_interval
@@ -88,60 +106,105 @@ class Robot(IdealRobot):
         if mode == True:
             if obs:
                 self.sensor_stuck.append(obs)
-    
-    def straight_to_landmark(self,mode,obs):
+
+    def straight_transition(self,nu,omega,time,obs):
+        self.keep_straight = True
         if obs:
-            if (obs[0][0][0] > 340) or (self.mode_switch == True):
-                    self.pose[2] = self.pose[2] + obs[0][0][1]
-                    print("theta = ", obs[0][0][1])
-                    #obs[0][0][1] = 0
-                    if self.mode_switch == False: 
-                        self.mode_switch = True
-                
-    def shift_transition(self, nu, omega, time):
-        t0 = self.pose[2]
-        if math.fabs(omega) < 1e-10:
-            return self.pose + np.array( [nu*math.cos(t0)+2.0,
-                                     nu*math.sin(t0),
-                                     omega ] ) / math.sqrt((nu*math.cos(t0)+2.0)**2 +(nu*math.sin(t0))**2) * math.sqrt((nu*math.cos(t0))**2 +(nu*math.sin(t0))**2) * time
+            t0 = obs[0][0][1]
         else:
-            return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time)- math.sin(t0))+2.0,nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),                                    omega*time ] ) / math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
+            t0 = self.pose[2]
+            if math.fabs(omega) < 1e-10:
+                return self.pose + np.array( [nu*math.cos(t0)*time, 
+                                 nu*math.sin(t0)*time,
+                                 omega*time ] )
+            else:
+                return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
+                                 nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+                                 omega*time ] )
+          
+        if math.fabs(omega) < 1e-10:
+            return self.pose + np.array( [nu*math.cos(t0)*time, 
+                                 nu*math.sin(t0)*time,
+                                 omega*time+t0 ] )
+        else:
+            return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
+                                 nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+                                 omega*time+t0 ] )
+                    
+    def shift_transition(self, nu, omega, time, obs):
+        self.keep_shift = True
+        if obs:
+            t0 = obs[0][0][1]
+        else:
+            t0 = self.pose[2]
+            if math.fabs(omega) < 1e-10:
+                return self.pose + np.array( [nu*math.cos(t0)+2.0, 
+                                 nu*math.sin(t0),
+                                 omega] )/ math.sqrt((nu*math.cos(t0)+2.0)**2 +(nu*math.sin(t0))**2) * math.sqrt((nu*math.cos(t0))**2 +(nu*math.sin(t0))**2) * time
+            else:
+                return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0, 
+                                 nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+                                 omega*time ] )/ math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
+          
+        if math.fabs(omega) < 1e-10:
+            return self.pose + np.array( [nu*math.cos(t0)*time+2.0, 
+                                 nu*math.sin(t0)*time,
+                                 omega*time+t0 ] )/ math.sqrt((nu*math.cos(t0)+2.0)**2 +(nu*math.sin(t0))**2) * math.sqrt((nu*math.cos(t0))**2 +(nu*math.sin(t0))**2) 
+        else:
+            return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0, 
+                                 nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+                                 omega*time+t0 ] )/ math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
+    
+    # mode change function
+    def mode_change(self,mode,obs):
+        if ((obs[0][0][0] > 340) and(self.shift_switch == False)) or (self.keep_straight == True) :
+            return Mode.STRAIGHT_TRANSITION
+        elif ((obs[0][0][0] > 340) and (self.shift_switch == True)) or (self.keep_shift == True):
+            return Mode.SHIFT_TRANSITION
+        else:
+            return Mode.STATE_TRANSITION
         
+    
+    def transition(self,mode, nu,omega, time,obs):
+        if mode == Mode.STATE_TRANSITION:
+            return self.state_transition(nu,omega,time,self.pose)
+        elif mode == Mode.STRAIGHT_TRANSITION:
+            return self.straight_transition(nu,omega, time, obs)
+        elif mode == Mode.SHIFT_TRANSITION:
+            return self.shift_transition(nu,omega,time, obs)
+        else:
+            return self.state_transition(nu,omega,time, self.pose)
+    
+    
+    def sensor_count(self, time_interval):
+        if(self.sensor_time >= 0.1) and (self.is_first == False):
+            self.sensor_time -= time_interval
+            return None
+        elif self.is_first == True:
+            self.is_first = False
+            return self.sensor.data(self.pose) if self.sensor else None
+        else:
+            self.sensor_time = self.const_time
+            return self.sensor.data(self.pose) if self.sensor else None
         
     def one_step(self,time_interval):
         if not self.agent: return
-        obs = []
-
-        if (self.sensor_time >= 0.1) & (self.is_first == False):
-            self.sensor_time -= time_interval
-        elif self.is_first == True:
-            obs = self.sensor.data(self.pose) if self.sensor else None
-            self.is_first = False
-        else:
-            obs = self.sensor.data(self.pose) if self.sensor else None
-            #print("obs = " , obs)
-            #print("pose = ", self.pose)
-            #print("sensor_stuck = ", self.sensor_stuck)
-            self.sensor_time = 1.0
-            if obs:
-                print(self.pose + np.array([obs[0][0][0] * math.cos(obs[0][0][1]), obs[0][0][0] * math.sin(obs[0][0][1]),0]))
         
+        obs = self.sensor_count(time_interval)
+            
         self.sensor_append(True,obs)
         
         nu, omega = self.agent.decision(obs)
         nu, omega = self.bias(nu,omega)
         nu, omega = self.stuck(nu,omega,time_interval)
         
-        self.straight_to_landmark(self.mode_switch, obs)
+        if obs:
+            self.mode = self.mode_change(self.mode,obs)
+            print(obs)
         
-        if self.mode_switch == True:
-            self.pose = self.shift_transition(nu,omega,time_interval)
-        else:
-            self.pose = self.state_transition(nu,omega,time_interval, self.pose)
-        self.pose = self.state_transition(nu,omega,time_interval, self.pose)
+        self.pose = self.transition(self.mode,nu,omega,time_interval,obs)
 
         self.pose = self.noise(self.pose, nu,omega, time_interval)
-        #print("obs =", obs) 
         self.pose = self.kidnap(self.pose, time_interval)
 
 
