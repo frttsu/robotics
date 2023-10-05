@@ -50,21 +50,30 @@ class Robot(IdealRobot):
         
         #one_stepに必要な関数
         self.is_first = True
-#         self.const_nu = 0
-#         self.const_omega = 0
         
         self.const_time = 1.0
-        self.sensor_time = self.const_time
+        self.sensor_time = self.const_time 
         
-#         self.const_pose = self.pose
+        self.distance_maximum = 340
+        self.distance_minimum = 30
         
         self.sensor_stuck = []
-        self.shift_switch = True
+        self.shift_switch = False
         
         self.keep_straight = False
         self.keep_shift = False
         
         self.mode = Mode.STATE_TRANSITION
+        
+        self.obs_stuck = 0
+        self.obs_sign = 0
+        
+        self.angle = 3
+        
+        self.a = 0
+        self.b = 0       
+        
+        self.accelerate_rate = 5
         
         
         
@@ -106,60 +115,68 @@ class Robot(IdealRobot):
         if mode == True:
             if obs:
                 self.sensor_stuck.append(obs)
+                
+    def sensor_return(self,obs):
+        if obs:         
+            if np.abs(obs[0][0][1]) > self.angle /180 * math.pi :
+                self.obs_stuck = np.abs(obs[0][0][1]) - self.angle / 180 * math.pi
+                self.obs_sign = np.sign(obs[0][0][1])
+                return  self.obs_sign * self.angle / 180 * math.pi
+            else:
+                return obs[0][0][1]
+
+        if self.obs_stuck > self.angle / 180 * math.pi:
+            self.obs_stuck = self.obs_stuck - self.angle / 180 * math.pi
+            return self.obs_sign *  self.angle / 180 * math.pi
+        else:
+            self.a = self.obs_stuck
+            self.b = self.obs_sign
+            self.obs_stuck = 0
+            self.obs_sign = 0
+            return self.a *self.b / 180 * math.pi
 
     def straight_transition(self,nu,omega,time,obs):
-        self.keep_straight = True
-        if obs:
-            t0 = obs[0][0][1]
-        else:
-            t0 = self.pose[2]
-            if math.fabs(omega) < 1e-10:
-                return self.pose + np.array( [nu*math.cos(t0)*time, 
-                                 nu*math.sin(t0)*time,
-                                 omega*time ] )
+        if obs:  
+            if obs[0][0][0] < self.distance_minimum:
+                self.keep_straight = False
             else:
-                return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
-                                 nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
-                                 omega*time ] )
-          
+                self.keep_straight = True
+            
+        t0 = self.pose[2]        
+            
         if math.fabs(omega) < 1e-10:
-            return self.pose + np.array( [nu*math.cos(t0)*time, 
-                                 nu*math.sin(t0)*time,
-                                 omega*time+t0 ] )
+            return self.pose + np.array( [nu* self.accelerate_rate * math.cos(t0)*time, 
+                             nu* self.accelerate_rate *math.sin(t0)*time,
+                             omega*time  + self.sensor_return(obs)] )
         else:
-            return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
-                                 nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
-                                 omega*time+t0 ] )
+            return self.pose + np.array( [nu * self.accelerate_rate / omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
+                             nu * self.accelerate_rate / omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+                             omega*time + self.sensor_return(obs) ] )
                     
     def shift_transition(self, nu, omega, time, obs):
-        self.keep_shift = True
         if obs:
-            t0 = obs[0][0][1]
-        else:
-            t0 = self.pose[2]
-            if math.fabs(omega) < 1e-10:
-                return self.pose + np.array( [nu*math.cos(t0)+2.0, 
-                                 nu*math.sin(t0),
-                                 omega] )/ math.sqrt((nu*math.cos(t0)+2.0)**2 +(nu*math.sin(t0))**2) * math.sqrt((nu*math.cos(t0))**2 +(nu*math.sin(t0))**2) * time
+            if obs[0][0][0] < self.distance_minimum:
+                self.keep_shift = False
             else:
-                return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0, 
-                                 nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
-                                 omega*time ] )/ math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
-          
+                self.keep_shift = True
+            
+        t0 = self.pose[2]
+        
         if math.fabs(omega) < 1e-10:
-            return self.pose + np.array( [nu*math.cos(t0)*time+2.0, 
-                                 nu*math.sin(t0)*time,
-                                 omega*time+t0 ] )/ math.sqrt((nu*math.cos(t0)+2.0)**2 +(nu*math.sin(t0))**2) * math.sqrt((nu*math.cos(t0))**2 +(nu*math.sin(t0))**2) 
+            return self.pose + np.array( [nu * self.accelerate_rate *math.cos(t0)*time+2.0, 
+                                 nu * self.accelerate_rate *math.sin(t0)*time,
+                                 omega*time+self.sensor_return(obs) ] )/ math.sqrt((nu * self.accelerate_rate *math.cos(t0)*time+2.0)**2 +(nu * self.accelerate_rate *math.sin(t0)*time)**2) * math.sqrt((nu * self.accelerate_rate *math.cos(t0)*time)**2 +(nu * self.accelerate_rate *math.sin(t0)*time)**2) 
         else:
-            return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0, 
-                                 nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
-                                 omega*time+t0 ] )/ math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
+            return self.pose + np.array( [nu * self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0, 
+                                 nu * self.accelerate_rate /omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+                                 omega*time+self.sensor_return(obs) ] )/ math.sqrt((nu* self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu* self.accelerate_rate/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu* self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu* self.accelerate_rate/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
+
     
     # mode change function
     def mode_change(self,mode,obs):
-        if ((obs[0][0][0] > 340) and(self.shift_switch == False)) or (self.keep_straight == True) :
+        if ((obs[0][0][0] > self.distance_maximum) and(self.shift_switch == False)) or (self.keep_straight == True) :
             return Mode.STRAIGHT_TRANSITION
-        elif ((obs[0][0][0] > 340) and (self.shift_switch == True)) or (self.keep_shift == True):
+        elif ((obs[0][0][0] > self.distance_maximum) and (self.shift_switch == True)) or (self.keep_shift == True):
             return Mode.SHIFT_TRANSITION
         else:
             return Mode.STATE_TRANSITION
