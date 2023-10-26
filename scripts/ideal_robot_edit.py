@@ -76,6 +76,7 @@ class IdealRobot:
         c = patches.Circle(xy=(x, y), radius=self.r, fill=False, color=self.color) 
         elems.append(ax.add_patch(c))
         self.poses.append(self.pose)
+        elems.append(ax.text(self.pose[0]-20, self.pose[1]-20, "child AUV", fontsize=8))         
         elems += ax.plot([e[0] for e in self.poses], [e[1] for e in self.poses], linewidth=0.5, color="black")
         if self.sensor and len(self.poses) > 1: 
             self.sensor.draw(ax, elems, self.poses[-2])
@@ -126,8 +127,8 @@ class Landmark:
     def draw(self, ax, elems):
         c = ax.scatter(self.pos[0], self.pos[1], s=30, marker="*", label="landmarks", color="orange")
         elems.append(c)
-        elems.append(ax.text(self.pos[0], self.pos[1], "id:" + str(self.id), fontsize=10))
-        
+#         elems.append(ax.text(self.pos[0], self.pos[1], "id:" + str(self.id), fontsize=10))
+        elems.append(ax.text(self.pos[0]-20, self.pos[1]-20, "parent AUV" + str(self.id), fontsize=8))
     def state_transition(cls, nu, omega, time, pose):
         t0 = pose[2]
         if math.fabs(omega) < 1e-10:
