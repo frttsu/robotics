@@ -169,7 +169,7 @@ class Map:
 
 
 class IdealCamera:
-    def __init__(self, env_map, distance_range=(0.5, 300), direction_range=(-math.pi, math.pi)):
+    def __init__(self, env_map, distance_range=(0.5, 350), direction_range=(-math.pi, math.pi)):
         self.map = env_map
         self.lastdata = []
         

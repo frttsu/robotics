@@ -56,20 +56,27 @@ class Mcl:    ###mlparticle（12〜18行目）
         self.ml = self.particles[0] #追加
         self.pose = self.ml.pose #追加（互換性のため）
         
+        self.sigma_xs = []
+        self.sigma_ys = []
+        
     def set_ml(self): #追加
         i = np.argmax([p.weight for p in self.particles])
         self.ml = self.particles[i]
         self.pose = self.ml.pose
         
     def motion_update(self, nu, omega, time): 
-        for p in self.particles: p.motion_update(nu, omega, time, self.motion_noise_rate_pdf)
+        x_particle = []
+        y_particle = []
+        for p in self.particles: 
+            p.motion_update(nu, omega, time, self.motion_noise_rate_pdf)
+            x_particle.append(p.pose[0])
+            y_particle.append(p.pose[1])
+        self.sigma_xs.append(np.std(x_particle))
+        self.sigma_ys.append(np.std(y_particle))
             
     def observation_update(self, observation): 
-        #i = 0
         for p in self.particles:
             p.observation_update(observation, self.map, self.distance_dev_rate, self.direction_dev) 
-            #print(i)
-            #i = i + 1
         self.set_ml() #リサンプリング前に実行
         self.resampling() 
             
@@ -111,8 +118,8 @@ class EstimationAgent(Agent):
         
         self.prev_nu = 0.0
         self.prev_omega = 0.0
-        self.sensor_time = 1
-        self.is_first = True
+#         self.sensor_time = 1
+#         self.is_first = True
         
     def decision(self, observation=None): 
         self.estimator.motion_update(self.prev_nu, self.prev_omega, self.time_interval)

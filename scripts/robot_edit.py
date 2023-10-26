@@ -230,7 +230,7 @@ class Robot(IdealRobot):
 
 class Camera(IdealCamera): ###noisesim_occlusion### 
     def __init__(self, env_map,
-                 distance_range=(0.5, 500),
+                 distance_range=(0.5, 350),
                  direction_range=(-math.pi, math.pi),
                  distance_noise_rate=0.05, direction_noise=math.pi/180,
                  distance_bias_rate_stddev=0.05, direction_bias_stddev=math.pi/180,
