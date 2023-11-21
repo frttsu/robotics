@@ -66,6 +66,7 @@ class IdealRobot:
         self.color = color 
         self.agent = agent
         self.poses = [pose]
+        self.id = 0
         self.sensor = sensor    # 追加
     
     def draw(self, ax, elems):         ### call_agent_draw
@@ -76,7 +77,7 @@ class IdealRobot:
         c = patches.Circle(xy=(x, y), radius=self.r, fill=False, color=self.color) 
         elems.append(ax.add_patch(c))
         self.poses.append(self.pose)
-        elems.append(ax.text(self.pose[0]-20, self.pose[1]-20, "child AUV", fontsize=8))         
+        elems.append(ax.text(self.pose[0]-20, self.pose[1]-20, "child AUV" + str(self.id), fontsize=8))         
         elems += ax.plot([e[0] for e in self.poses], [e[1] for e in self.poses], linewidth=0.5, color="black")
         if self.sensor and len(self.poses) > 1: 
             self.sensor.draw(ax, elems, self.poses[-2])
@@ -151,17 +152,17 @@ class Landmark:
 
 class Map:
     def __init__(self):       # 空のランドマークのリストを準備
-        self.landmarks = []
+        self.objects = []
         
-    def append_landmark(self, landmark):       # ランドマークを追加
-        landmark.id = len(self.landmarks)           # 追加するランドマークにIDを与える
-        self.landmarks.append(landmark)
+    def append_object(self, ob):       # ランドマークを追加
+        ob.id = len(self.objects)           # 追加するランドマークにIDを与える
+        self.objects.append(ob)
 
     def draw(self, ax, elems):                 # 描画（Landmarkのdrawを順に呼び出し）
-        for lm in self.landmarks: lm.draw(ax, elems)
+        for ob in self.objects: ob.draw(ax, elems)
 
     def one_step(self,time_interval):
-        for lm in self.landmarks: lm.one_step(time_interval)
+        for ob in self.objects: ob.one_step(time_interval)
                          
 
 
@@ -188,7 +189,7 @@ class IdealCamera:
         
     def data(self, cam_pose):
         observed = []
-        for lm in self.map.landmarks:
+        for lm in self.map.objects:
             z = self.observation_function(cam_pose, lm.pos)
             if self.visible(z):               # 条件を追加
                 observed.append((z, lm.id))   # インデント

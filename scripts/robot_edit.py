@@ -281,7 +281,7 @@ class Camera(IdealCamera): ###noisesim_occlusion###
     
     def data(self, cam_pose):
         observed = []
-        for lm in self.map.landmarks:
+        for lm in self.map.objects:
             #print("camera data obj=",lm.pos)
             #print("camera data cam=", cam_pose)
             z = self.observation_function(cam_pose, lm.pos)
