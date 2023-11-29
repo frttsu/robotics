@@ -11,10 +11,16 @@ import matplotlib.pyplot as plt
 import math
 import matplotlib.patches as patches
 import numpy as np
+from enum import Enum
 
 
 # In[2]:
 
+
+class Mode(Enum):
+    STATE_TRANSITION = 1
+    STRAIGHT_TRANSITION = 2
+    SHIFT_TRANSITION = 3
 
 class World:
     def __init__(self, time_span, time_interval, debug=True):
@@ -55,12 +61,104 @@ class World:
             obj.draw(ax, elems)
             if hasattr(obj, "one_step"): obj.one_step(self.time_interval)    
 
+class rob:
+    def __init__(self,pose,agent):
+        self.pose = pose
+        self.agent = agent
+        
+        self.obs_stuck = 0
+        self.obs_sign = 0
+        
+        self.angle = 3
+        
+        self.a = 0
+        self.b = 0
+    
+    def draw(self,ax, elems):
+        pass
+    
+    def state_transition(self,nu,omega,time,pose):
+        t0 = pose[2]
+        if math.fabs(omega) < 1e-10:
+            return pose + np.array( [nu*math.cos(t0), 
+                                     nu*math.sin(t0),
+                                     omega ] ) * time
+        else:
+            return pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
+                                     nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+                                     omega*time ] )
+    #agentXクラスのもとでつかうことを想定          
+    def transition(self, nu,omega, time,obs):
+        if self.agent.mode == Mode.STATE_TRANSITION:
+            return self.state_transition(nu,omega,time,self.pose)
+        elif self.agent.mode == Mode.STRAIGHT_TRANSITION:
+            return self.straight_transition(nu,omega, time, obs)
+        elif self.agent.mode == Mode.SHIFT_TRANSITION:
+            return self.shift_transition(nu,omega,time, obs)
+        else:
+            return self.state_transition(nu,omega,time, self.pose)
+        
+    def sensor_return(self,obs):
+        if obs:         
+            if np.abs(obs[0][0][1]) > self.angle /180 * math.pi :
+                self.obs_stuck = np.abs(obs[0][0][1]) - self.angle / 180 * math.pi
+                self.obs_sign = np.sign(obs[0][0][1])
+                return  self.obs_sign * self.angle / 180 * math.pi
+            else:
+                return obs[0][0][1]
+
+        if self.obs_stuck > self.angle / 180 * math.pi:
+            self.obs_stuck = self.obs_stuck - self.angle / 180 * math.pi
+            return self.obs_sign *  self.angle / 180 * math.pi
+        else:
+            self.a = self.obs_stuck
+            self.b = self.obs_sign
+            self.obs_stuck = 0
+            self.obs_sign = 0
+            return self.a *self.b / 180 * math.pi
+   #agentXクラスのもとでつかうことを想定                         
+    def straight_transition(self,nu,omega,time,obs):
+        if obs:  
+            if obs[0][0][0] < self.agent.distance_minimum:
+                self.agent.decelerate_nu()
+                self.agent.keep_straight_change()
+                
+
+        t0 = self.pose[2]        
+            
+        if math.fabs(omega) < 1e-10:
+            return self.pose + np.array( [nu* math.cos(t0)*time, 
+                             nu *math.sin(t0)*time,
+                             omega*time  + self.sensor_return(obs)] )
+        else:
+            return self.pose + np.array( [nu  / omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
+                             nu  / omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+                             omega*time + self.sensor_return(obs) ] )
+        
+    #agentXクラスのもとでつかうことを想定                      
+    def shift_transition(self, nu, omega, time, obs):
+        if obs:
+            if obs[0][0][0] < self.agent.distance_minimum:
+                self.agent.decelerate_nu
+                self.agent.keep_shift_change()
+            
+        t0 = self.pose[2]
+        
+        if math.fabs(omega) < 1e-10:
+            return self.pose + np.array( [nu *math.cos(t0)*time+2.0, 
+                                 nu *math.sin(t0)*time,
+                                 omega*time+self.sensor_return(obs) ] )/ math.sqrt((nu * self.accelerate_rate *math.cos(t0)*time+2.0)**2 +(nu * self.accelerate_rate *math.sin(t0)*time)**2) * math.sqrt((nu * self.accelerate_rate *math.cos(t0)*time)**2 +(nu * self.accelerate_rate *math.sin(t0)*time)**2) 
+        else:
+            return self.pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0, 
+                                 nu  /omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+                                 omega*time+self.sensor_return(obs) ] )/ math.sqrt((nu/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu* self.accelerate_rate/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu* self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu* self.accelerate_rate/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
 
 # In[3]:
 
 
-class IdealRobot:   
+class IdealRobot(rob):   
     def __init__(self, pose, agent=None, sensor=None, color="black"):    # 引数を追加
+        super().__init__(pose,agent)
         self.pose = pose
         self.r = 10  
         self.color = color 
@@ -84,17 +182,17 @@ class IdealRobot:
         if self.agent and hasattr(self.agent, "draw"):                               #以下2行追加   
             self.agent.draw(ax, elems)
          
-    @classmethod           
-    def state_transition(cls, nu, omega, time, pose):
-        t0 = pose[2]
-        if math.fabs(omega) < 1e-10:
-            return pose + np.array( [nu*math.cos(t0), 
-                                     nu*math.sin(t0),
-                                     omega ] ) * time
-        else:
-            return pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
-                                     nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
-                                     omega*time ] )
+#     @classmethod           
+#     def state_transition(cls, nu, omega, time, pose):
+#         t0 = pose[2]
+#         if math.fabs(omega) < 1e-10:
+#             return pose + np.array( [nu*math.cos(t0), 
+#                                      nu*math.sin(t0),
+#                                      omega ] ) * time
+#         else:
+#             return pose + np.array( [nu/omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
+#                                      nu/omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+#                                      omega*time ] )
 
     def one_step(self, time_interval):
         if not self.agent: return        
@@ -104,6 +202,8 @@ class IdealRobot:
         if self.sensor: self.sensor.data(self.pose)   
 
 
+            
+            
 # In[4]:
 
 
@@ -111,10 +211,59 @@ class Agent:
     def __init__(self, nu, omega):
         self.nu = nu
         self.omega = omega
+        self.mode = Mode.STATE_TRANSITION
         
     def decision(self, observation=None):
         return self.nu, self.omega
 
+class AgentX:
+    def __init__(self, nu, omega):
+        self.nu = nu
+        self.omega = omega
+        
+        self.mode = Mode.STATE_TRANSITION
+        
+        self.accelerate_rate = 5   
+        self.shift_switch = False
+        self.keep_straight = False
+        self.keep_shift = False
+        
+        self.distance_maximum = 320
+        self.distance_minimum = 150
+        
+    def decision(self, observation=None):
+        if observation:
+            self.mode = self.mode_change(observation)
+        return self.nu, self.omega
+    
+    def shift_switch_change(self):
+        self.shift_switch = not self.shift_switch
+    
+    def keep_straight_change(self):
+        self.keep_straight = not self.keep_straight
+    
+    def keep_shift_change(self):
+        self.keep_shift = not self.keep_shift
+        
+    def accelerate_nu(self):
+        self.nu = self.nu * self.accelerate_rate
+    
+    def decelerate_nu(self):
+        self.nu = self.nu / self.accelerate_rate
+        
+    def mode_change(self,obs):
+        if ((obs[0][0][0] > self.distance_maximum) and(self.shift_switch == False)) or (self.keep_straight == True) :
+            if (self.keep_straight == False) :
+                self.accelerate_nu()
+                self.keep_straight_change()
+            return Mode.STRAIGHT_TRANSITION
+        elif ((obs[0][0][0] > self.distance_maximum) and (self.shift_switch == True)) or (self.keep_shift == True):
+            if (self.keep_shift == False):
+                self.accelerate_nu()
+                self.nu = self.nu * self.accelerate_rate
+            return Mode.SHIFT_TRANSITION
+        else:
+            return Mode.STATE_TRANSITION
 
 # In[5]:
 

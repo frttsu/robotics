@@ -14,16 +14,19 @@ import copy
 # In[2]:
 
 
-class Particle: 
-    def __init__(self, init_pose, weight, ):
-        self.pose = init_pose
+class Particle(rob): 
+    def __init__(self, init_pose, agent, weight ):
+        super().__init__(init_pose, agent)
         self.weight = weight
+        self.obs = []
         
     def motion_update(self, nu, omega, time, noise_rate_pdf): 
         ns = noise_rate_pdf.rvs()
         pnu = nu + ns[0]*math.sqrt(abs(nu)/time) + ns[1]*math.sqrt(abs(omega)/time)
         pomega = omega + ns[2]*math.sqrt(abs(nu)/time) + ns[3]*math.sqrt(abs(omega)/time)
-        self.pose = IdealRobot.state_transition(pnu, pomega, time, self.pose)
+        if self.obs:
+            self.mode = self.agent.mode_change(self.obs)
+        self.pose = self.transition(pnu, pomega, time, self.obs)
         
     def observation_update(self, observation, envmap, distance_dev_rate, direction_dev):  #変更_
         for d in observation:
@@ -45,7 +48,7 @@ class Particle:
 
 class Mcl:    ###mlparticle（12〜18行目）
     def __init__(self, envmap, init_pose, num, motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo":0.2},                  distance_dev_rate=0.14, direction_dev=0.05):
-        self.particles = [Particle(init_pose, 1.0/num) for i in range(num)]
+        self.particles = [Particle(init_pose,AgentX(0,0), 1.0/num) for i in range(num)]
         self.map = envmap
         self.distance_dev_rate = distance_dev_rate
         self.direction_dev = direction_dev
@@ -110,7 +113,7 @@ class Mcl:    ###mlparticle（12〜18行目）
 # In[4]:
 
 
-class EstimationAgent(Agent): 
+class EstimationAgent(AgentX): 
     def __init__(self, time_interval, nu, omega, estimator):
         super().__init__(nu, omega)
         self.estimator = estimator
@@ -126,6 +129,7 @@ class EstimationAgent(Agent):
         self.prev_nu, self.prev_omega = self.nu, self.omega
         if observation:
             self.estimator.observation_update(observation)
+            self.mode = self.mode_change(observation)
         return self.nu, self.omega
         
     def draw(self, ax, elems): ###mlwrite

@@ -13,12 +13,6 @@ from enum import Enum
 
 # In[2]:
 
-class Mode(Enum):
-    STATE_TRANSITION = 1
-    STRAIGHT_TRANSITION = 2
-    SHIFT_TRANSITION = 3
-# In[2]:
-
 
 class Robot(IdealRobot):
         
@@ -54,26 +48,26 @@ class Robot(IdealRobot):
         self.const_time = 1.0
         self.sensor_time = self.const_time 
         
-        self.distance_maximum = 340
-        self.distance_minimum = 30
+#         self.distance_maximum = 340
+#         self.distance_minimum = 30
         
         self.sensor_stuck = []
-        self.shift_switch = False
+#         self.shift_switch = False
         
-        self.keep_straight = False
-        self.keep_shift = False
+#         self.keep_straight = False
+#         self.keep_shift = False
         
-        self.mode = Mode.STATE_TRANSITION
+#         self.mode = Mode.STATE_TRANSITION
         
-        self.obs_stuck = 0
-        self.obs_sign = 0
+#         self.obs_stuck = 0
+#         self.obs_sign = 0
         
-        self.angle = 3
+#         self.angle = 3
         
-        self.a = 0
-        self.b = 0       
+#         self.a = 0
+#         self.b = 0       
         
-        self.accelerate_rate = 5
+#         self.accelerate_rate = 5
         
         
         
@@ -116,81 +110,81 @@ class Robot(IdealRobot):
             if obs:
                 self.sensor_stuck.append(obs)
                 
-    def sensor_return(self,obs):
-        if obs:         
-            if np.abs(obs[0][0][1]) > self.angle /180 * math.pi :
-                self.obs_stuck = np.abs(obs[0][0][1]) - self.angle / 180 * math.pi
-                self.obs_sign = np.sign(obs[0][0][1])
-                return  self.obs_sign * self.angle / 180 * math.pi
-            else:
-                return obs[0][0][1]
+#     def sensor_return(self,obs):
+#         if obs:         
+#             if np.abs(obs[0][0][1]) > self.angle /180 * math.pi :
+#                 self.obs_stuck = np.abs(obs[0][0][1]) - self.angle / 180 * math.pi
+#                 self.obs_sign = np.sign(obs[0][0][1])
+#                 return  self.obs_sign * self.angle / 180 * math.pi
+#             else:
+#                 return obs[0][0][1]
 
-        if self.obs_stuck > self.angle / 180 * math.pi:
-            self.obs_stuck = self.obs_stuck - self.angle / 180 * math.pi
-            return self.obs_sign *  self.angle / 180 * math.pi
-        else:
-            self.a = self.obs_stuck
-            self.b = self.obs_sign
-            self.obs_stuck = 0
-            self.obs_sign = 0
-            return self.a *self.b / 180 * math.pi
+#         if self.obs_stuck > self.angle / 180 * math.pi:
+#             self.obs_stuck = self.obs_stuck - self.angle / 180 * math.pi
+#             return self.obs_sign *  self.angle / 180 * math.pi
+#         else:
+#             self.a = self.obs_stuck
+#             self.b = self.obs_sign
+#             self.obs_stuck = 0
+#             self.obs_sign = 0
+#             return self.a *self.b / 180 * math.pi
 
-    def straight_transition(self,nu,omega,time,obs):
-        if obs:  
-            if obs[0][0][0] < self.distance_minimum:
-                self.keep_straight = False
-            else:
-                self.keep_straight = True
+#     def straight_transition(self,nu,omega,time,obs):
+#         if obs:  
+#             if obs[0][0][0] < self.distance_minimum:
+#                 self.keep_straight = False
+#             else:
+#                 self.keep_straight = True
             
-        t0 = self.pose[2]        
+#         t0 = self.pose[2]        
             
-        if math.fabs(omega) < 1e-10:
-            return self.pose + np.array( [nu* self.accelerate_rate * math.cos(t0)*time, 
-                             nu* self.accelerate_rate *math.sin(t0)*time,
-                             omega*time  + self.sensor_return(obs)] )
-        else:
-            return self.pose + np.array( [nu * self.accelerate_rate / omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
-                             nu * self.accelerate_rate / omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
-                             omega*time + self.sensor_return(obs) ] )
+#         if math.fabs(omega) < 1e-10:
+#             return self.pose + np.array( [nu* self.accelerate_rate * math.cos(t0)*time, 
+#                              nu* self.accelerate_rate *math.sin(t0)*time,
+#                              omega*time  + self.sensor_return(obs)] )
+#         else:
+#             return self.pose + np.array( [nu * self.accelerate_rate / omega*(math.sin(t0 + omega*time) - math.sin(t0)), 
+#                              nu * self.accelerate_rate / omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+#                              omega*time + self.sensor_return(obs) ] )
                     
-    def shift_transition(self, nu, omega, time, obs):
-        if obs:
-            if obs[0][0][0] < self.distance_minimum:
-                self.keep_shift = False
-            else:
-                self.keep_shift = True
+#     def shift_transition(self, nu, omega, time, obs):
+#         if obs:
+#             if obs[0][0][0] < self.distance_minimum:
+#                 self.keep_shift = False
+#             else:
+#                 self.keep_shift = True
             
-        t0 = self.pose[2]
+#         t0 = self.pose[2]
         
-        if math.fabs(omega) < 1e-10:
-            return self.pose + np.array( [nu * self.accelerate_rate *math.cos(t0)*time+2.0, 
-                                 nu * self.accelerate_rate *math.sin(t0)*time,
-                                 omega*time+self.sensor_return(obs) ] )/ math.sqrt((nu * self.accelerate_rate *math.cos(t0)*time+2.0)**2 +(nu * self.accelerate_rate *math.sin(t0)*time)**2) * math.sqrt((nu * self.accelerate_rate *math.cos(t0)*time)**2 +(nu * self.accelerate_rate *math.sin(t0)*time)**2) 
-        else:
-            return self.pose + np.array( [nu * self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0, 
-                                 nu * self.accelerate_rate /omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
-                                 omega*time+self.sensor_return(obs) ] )/ math.sqrt((nu* self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu* self.accelerate_rate/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu* self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu* self.accelerate_rate/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
+#         if math.fabs(omega) < 1e-10:
+#             return self.pose + np.array( [nu * self.accelerate_rate *math.cos(t0)*time+2.0, 
+#                                  nu * self.accelerate_rate *math.sin(t0)*time,
+#                                  omega*time+self.sensor_return(obs) ] )/ math.sqrt((nu * self.accelerate_rate *math.cos(t0)*time+2.0)**2 +(nu * self.accelerate_rate *math.sin(t0)*time)**2) * math.sqrt((nu * self.accelerate_rate *math.cos(t0)*time)**2 +(nu * self.accelerate_rate *math.sin(t0)*time)**2) 
+#         else:
+#             return self.pose + np.array( [nu * self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0, 
+#                                  nu * self.accelerate_rate /omega*(-math.cos(t0 + omega*time) + math.cos(t0)),
+#                                  omega*time+self.sensor_return(obs) ] )/ math.sqrt((nu* self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0))+2.0)**2 + (nu* self.accelerate_rate/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 )) * math.sqrt((nu* self.accelerate_rate/omega*(math.sin(t0 + omega*time) - math.sin(t0)))**2 + (nu* self.accelerate_rate/omega*(-math.cos(t0 + omega*time) + math.cos(t0))**2 ))
 
     
-    # mode change function
-    def mode_change(self,mode,obs):
-        if ((obs[0][0][0] > self.distance_maximum) and(self.shift_switch == False)) or (self.keep_straight == True) :
-            return Mode.STRAIGHT_TRANSITION
-        elif ((obs[0][0][0] > self.distance_maximum) and (self.shift_switch == True)) or (self.keep_shift == True):
-            return Mode.SHIFT_TRANSITION
-        else:
-            return Mode.STATE_TRANSITION
+#     # mode change function
+#     def mode_change(self,mode,obs):
+#         if ((obs[0][0][0] > self.distance_maximum) and(self.shift_switch == False)) or (self.keep_straight == True) :
+#             return Mode.STRAIGHT_TRANSITION
+#         elif ((obs[0][0][0] > self.distance_maximum) and (self.shift_switch == True)) or (self.keep_shift == True):
+#             return Mode.SHIFT_TRANSITION
+#         else:
+#             return Mode.STATE_TRANSITION
         
     
-    def transition(self,mode, nu,omega, time,obs):
-        if mode == Mode.STATE_TRANSITION:
-            return self.state_transition(nu,omega,time,self.pose)
-        elif mode == Mode.STRAIGHT_TRANSITION:
-            return self.straight_transition(nu,omega, time, obs)
-        elif mode == Mode.SHIFT_TRANSITION:
-            return self.shift_transition(nu,omega,time, obs)
-        else:
-            return self.state_transition(nu,omega,time, self.pose)
+#     def transition(self,mode, nu,omega, time,obs):
+#         if mode == Mode.STATE_TRANSITION:
+#             return self.state_transition(nu,omega,time,self.pose)
+#         elif mode == Mode.STRAIGHT_TRANSITION:
+#             return self.straight_transition(nu,omega, time, obs)
+#         elif mode == Mode.SHIFT_TRANSITION:
+#             return self.shift_transition(nu,omega,time, obs)
+#         else:
+#             return self.state_transition(nu,omega,time, self.pose)
     
     
     def sensor_count(self, time_interval):
@@ -215,11 +209,11 @@ class Robot(IdealRobot):
         nu, omega = self.bias(nu,omega)
         nu, omega = self.stuck(nu,omega,time_interval)
         
-        if obs:
-            self.mode = self.mode_change(self.mode,obs)
-            print(obs)
+#         if obs:
+#             self.mode = self.mode_change(self.mode,obs)
+#             print(obs)
         
-        self.pose = self.transition(self.mode,nu,omega,time_interval,obs)
+        self.pose = self.transition(nu,omega,time_interval,obs)
 
         self.pose = self.noise(self.pose, nu,omega, time_interval)
         self.pose = self.kidnap(self.pose, time_interval)
