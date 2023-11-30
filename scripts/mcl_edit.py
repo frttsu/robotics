@@ -47,8 +47,11 @@ class Particle(rob):
 
 
 class Mcl:    ###mlparticle（12〜18行目）
-    def __init__(self, envmap, init_pose, num, motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo":0.2},                  distance_dev_rate=0.14, direction_dev=0.05):
-        self.particles = [Particle(init_pose,AgentX(0,0), 1.0/num) for i in range(num)]
+    def __init__(self, envmap, init_pose, num,accelerate_rate,distance_minimum, distance_maximum,  motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo":0.2},                  distance_dev_rate=0.14, direction_dev=0.05):
+        self.accelerate_rate = accelerate_rate
+        self.distance_maximum = distance_minimum
+        self.distance_minimum = distance_maximum
+        self.particles = [Particle(init_pose,AgentX(0,0, accelerate_rate, distance_minimum,distance_maximum), 1.0/num) for i in range(num)]
         self.map = envmap
         self.distance_dev_rate = distance_dev_rate
         self.direction_dev = direction_dev
@@ -114,13 +117,14 @@ class Mcl:    ###mlparticle（12〜18行目）
 
 
 class EstimationAgent(AgentX): 
-    def __init__(self, time_interval, nu, omega, estimator):
-        super().__init__(nu, omega)
+    def __init__(self, time_interval, nu, omega,accelerate_rate,distance_minimum, distance_maximum, estimator):
+        super().__init__(nu, omega,accelerate_rate,distance_minimum, distance_maximum)
         self.estimator = estimator
         self.time_interval = time_interval
         
         self.prev_nu = 0.0
         self.prev_omega = 0.0
+        
 #         self.sensor_time = 1
 #         self.is_first = True
         

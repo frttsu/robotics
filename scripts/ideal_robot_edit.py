@@ -6,6 +6,7 @@
 
 import matplotlib
 matplotlib.use('nbagg')
+import sys
 import matplotlib.animation as anm
 import matplotlib.pyplot as plt
 import math
@@ -155,7 +156,6 @@ class rob:
 
 # In[3]:
 
-
 class IdealRobot(rob):   
     def __init__(self, pose, agent=None, sensor=None, color="black"):    # 引数を追加
         super().__init__(pose,agent)
@@ -169,15 +169,15 @@ class IdealRobot(rob):
     
     def draw(self, ax, elems):         ### call_agent_draw
         x, y, theta = self.pose  
-        xn = x + self.r * math.cos(theta)  
-        yn = y + self.r * math.sin(theta)  
+        xn = x + self.r * math.cos(theta)
+        yn = y + self.r * math.sin(theta)
         elems += ax.plot([x,xn], [y,yn], color=self.color)
         c = patches.Circle(xy=(x, y), radius=self.r, fill=False, color=self.color) 
         elems.append(ax.add_patch(c))
         self.poses.append(self.pose)
         elems.append(ax.text(self.pose[0]-20, self.pose[1]-20, "child AUV" + str(self.id), fontsize=8))         
         elems += ax.plot([e[0] for e in self.poses], [e[1] for e in self.poses], linewidth=0.5, color="black")
-        if self.sensor and len(self.poses) > 1: 
+        if self.sensor and len(self.poses) > 1:
             self.sensor.draw(ax, elems, self.poses[-2])
         if self.agent and hasattr(self.agent, "draw"):                               #以下2行追加   
             self.agent.draw(ax, elems)
@@ -200,9 +200,6 @@ class IdealRobot(rob):
         nu, omega = self.agent.decision(obs) #引数追加
         self.pose = self.state_transition(nu, omega, time_interval, self.pose)
         if self.sensor: self.sensor.data(self.pose)   
-
-
-            
             
 # In[4]:
 
@@ -217,19 +214,23 @@ class Agent:
         return self.nu, self.omega
 
 class AgentX:
-    def __init__(self, nu, omega):
+    def __init__(self, nu, omega,accelerate_rate, distance_minimum,distance_maximum):
         self.nu = nu
         self.omega = omega
         
         self.mode = Mode.STATE_TRANSITION
         
-        self.accelerate_rate = 5   
+        self.accelerate_rate = accelerate_rate
         self.shift_switch = False
         self.keep_straight = False
         self.keep_shift = False
         
-        self.distance_maximum = 320
-        self.distance_minimum = 150
+        self.distance_maximum = distance_maximum
+        self.distance_minimum = distance_minimum
+        if(distance_minimum > distance_maximum):
+            print("input error")
+            sys.exit()
+            
         
     def decision(self, observation=None):
         if observation:
@@ -265,6 +266,35 @@ class AgentX:
         else:
             return Mode.STATE_TRANSITION
 
+        
+class AgentY:
+    def __init__(self,time_interval, data):
+        self.nu = 0
+        self.omega = 0
+        self.time_interval = time_interval
+        self.data = data
+        self.iterator = iter(self.data)
+        self.current_data = []
+        self.time = 0
+        self.mode = Mode.STATE_TRANSITION
+        
+    def decision(self, observation=None):
+        self.data_change()
+        return self.nu, self.omega
+        
+    def data_change(self):
+        if(self.time <= 1e-10):
+            self.current_data = next(self.iterator, "end")
+            if(self.current_data == "end"):
+#                 print("byebye")
+                return
+            print(self.current_data)
+            self.nu = self.current_data[0]
+            self.omega = self.current_data[1]
+            self.time = self.current_data[2]
+        self.time = self.time - self.time_interval
+#        print(self.time)
+            
 # In[5]:
 
 
